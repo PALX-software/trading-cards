@@ -8,7 +8,7 @@ import type { Profile } from '@/lib/types'
 import { useI18n } from '@/lib/i18n'
 import {
   Trophy, ShoppingBag, Gavel, LayoutDashboard,
-  LogOut, User, Menu, X, Wallet, Globe
+  LogOut, User, Menu, X, Wallet, Globe, RefreshCw
 } from 'lucide-react'
 
 export default function Navbar() {
@@ -55,7 +55,10 @@ export default function Navbar() {
   const navLinks = [
     { href: '/marketplace', label: lang === 'es' ? 'Mercado' : 'Marketplace', icon: ShoppingBag },
     { href: '/auctions', label: lang === 'es' ? 'Subastas' : 'Auctions', icon: Gavel },
-    ...(profile ? [{ href: '/dashboard', label: lang === 'es' ? 'Panel' : 'Dashboard', icon: LayoutDashboard }] : []),
+    ...(profile ? [
+      { href: '/trades', label: lang === 'es' ? 'Intercambios' : 'Trades', icon: RefreshCw },
+      { href: '/dashboard', label: lang === 'es' ? 'Panel' : 'Dashboard', icon: LayoutDashboard },
+    ] : []),
   ]
 
   return (

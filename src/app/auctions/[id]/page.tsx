@@ -9,7 +9,8 @@ import CountdownTimer from '@/components/CountdownTimer'
 import TradingCard from '@/components/TradingCard'
 import type { Auction, Bid, Profile } from '@/lib/types'
 import { PRICING, RARITY_LABELS, CONDITION_LABELS } from '@/lib/types'
-import { Gavel, TrendingUp, Users, Trophy, ArrowLeft } from 'lucide-react'
+import { Gavel, TrendingUp, Users, Trophy, ArrowLeft, MessageSquare } from 'lucide-react'
+import Chat from '@/components/Chat'
 import Link from 'next/link'
 import { format } from 'date-fns'
 
@@ -150,7 +151,7 @@ export default function AuctionDetailPage() {
             <div style={{ position: 'sticky', top: '5rem' }}>
               {auction.card && (
                 <div style={{ maxWidth: '280px' }}>
-                  <TradingCard card={auction.card} showActions={false} />
+                  <TradingCard card={auction.card} />
                 </div>
               )}
 
@@ -358,6 +359,29 @@ export default function AuctionDetailPage() {
                   </div>
                 )}
               </div>
+
+              {/* Coordination Chat (seller + winner after auction ends) */}
+              {auction.status === 'ended' && user && (user.id === auction.seller_id || user.id === auction.winner_id) && (
+                <div style={{ marginTop: '2rem' }}>
+                  <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <MessageSquare size={18} style={{ color: 'var(--gold)' }} />
+                    Chat de Coordinación
+                  </h2>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                    Coordina con la otra parte cómo enviar la estampa.
+                  </p>
+                  <Chat
+                    roomType="auction"
+                    roomId={auction.id}
+                    currentUserId={user.id}
+                    otherUserName={
+                      user.id === auction.seller_id
+                        ? (auction.winner as any)?.username
+                        : (auction.seller as any)?.username
+                    }
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

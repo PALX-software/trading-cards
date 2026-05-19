@@ -162,7 +162,7 @@ export default function AuctionsPage() {
                       </div>
                       <div className="badge badge-red" style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                         <Clock size={12} />
-                        <CountdownTimer targetDate={auction.ends_at} />
+                        <CountdownTimer endsAt={auction.ends_at} />
                       </div>
                     </div>
 
