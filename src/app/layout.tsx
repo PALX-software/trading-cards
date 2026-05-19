@@ -51,21 +51,12 @@ export const metadata: Metadata = {
     title: "World Cup Trading Cards — Estampas FIFA 2026",
     description:
       "Álbum digital del Mundial FIFA 2026. Intercambia estampas repetidas, entra a subastas en vivo y completa tu colección.",
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "World Cup Trading Cards — Mercado de Estampas FIFA 2026",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "World Cup Trading Cards — Estampas FIFA 2026",
     description:
       "Álbum digital del Mundial FIFA 2026. Intercambia repetidas, sube a subastas y completa tu colección.",
-    images: ["/og-image.png"],
   },
   icons: {
     icon: "/favicon.ico",
