@@ -209,10 +209,30 @@ export interface Message {
   sender?: Profile
 }
 
+// FIFA World Cup 2026 — all 48 qualified teams (Groups A–L)
 export const WORLD_CUP_TEAMS = [
-  'Argentina', 'Brazil', 'France', 'Germany', 'Spain', 'England',
-  'Italy', 'Portugal', 'Netherlands', 'Belgium', 'Croatia', 'Uruguay',
-  'Mexico', 'USA', 'Japan', 'South Korea', 'Morocco', 'Senegal',
-  'Australia', 'Denmark', 'Switzerland', 'Poland', 'Ecuador', 'Cameroon',
-  'Canada', 'Ghana', 'Qatar', 'Serbia', 'Tunisia', 'Iran', 'Saudi Arabia', 'Wales',
+  // Group A
+  'Mexico', 'South Africa', 'South Korea', 'Czechia',
+  // Group B
+  'Canada', 'Bosnia-Herzegovina', 'Qatar', 'Switzerland',
+  // Group C
+  'Brazil', 'Morocco', 'Haiti', 'Scotland',
+  // Group D
+  'United States', 'Paraguay', 'Australia', 'Türkiye',
+  // Group E
+  'Germany', 'Curaçao', 'Ivory Coast', 'Ecuador',
+  // Group F
+  'Netherlands', 'Japan', 'Sweden', 'Tunisia',
+  // Group G
+  'Belgium', 'Egypt', 'Iran', 'New Zealand',
+  // Group H
+  'Spain', 'Cape Verde', 'Saudi Arabia', 'Uruguay',
+  // Group I
+  'France', 'Senegal', 'Iraq', 'Norway',
+  // Group J
+  'Argentina', 'Algeria', 'Austria', 'Jordan',
+  // Group K
+  'Portugal', 'DR Congo', 'Uzbekistan', 'Colombia',
+  // Group L
+  'England', 'Croatia', 'Ghana', 'Panama',
 ]
