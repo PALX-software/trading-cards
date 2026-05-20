@@ -19,9 +19,9 @@ export default async function AdminLayout({
     redirect('/')
   }
 
-  // Admin check: is_admin flag OR hardcoded admin email
-  const ADMIN_EMAIL = 'joseluispalillero@gmail.com'
-  const isAdminByEmail = user.email === ADMIN_EMAIL
+  // Admin check: is_admin flag OR fallback email from env var
+  const adminEmail = process.env.ADMIN_EMAIL
+  const isAdminByEmail = adminEmail ? user.email === adminEmail : false
 
   if (!isAdminByEmail) {
     const { data: profile } = await supabase

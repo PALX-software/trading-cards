@@ -1,17 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Trophy, Mail, Lock, ArrowRight, Home } from 'lucide-react'
 import ToastContainer, { showToast } from '@/components/Toast'
 import { useI18n } from '@/lib/i18n'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
   const supabase = createClient()
   const { lang } = useI18n()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirect') || '/dashboard'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -26,7 +28,7 @@ export default function LoginPage() {
       showToast(lang === 'es' ? 'Credenciales incorrectas' : error.message, 'error')
       setLoading(false)
     } else {
-      router.push('/dashboard')
+      router.push(redirectTo)
       router.refresh()
     }
   }
@@ -123,5 +125,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   )
 }

@@ -48,7 +48,7 @@ export default function Chat({ roomType, roomId, currentUserId, otherUserName }:
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `room_id=eq.${roomId}`,
+          filter: `room_id=eq.${roomId},room_type=eq.${roomType}`,
         },
         async (payload) => {
           // Fetch the sender profile for the new message

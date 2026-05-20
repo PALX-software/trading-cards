@@ -58,40 +58,21 @@ export default function RegisterPage() {
     if (!userId) return
     setLoading(true)
 
-    // Simulate payment processing
-    await new Promise(resolve => setTimeout(resolve, 1500))
-
-    // Record the payment
-    const { error: payError } = await supabase.from('payments').insert({
-      user_id: userId,
-      type: 'membership',
-      amount: PRICING.MEMBERSHIP_FEE,
-      status: 'completed',
-      payment_method: 'simulated'
-    })
-
-    if (payError) {
-      showToast(lang === 'es' ? 'El pago falló' : 'Payment failed', 'error')
+    try {
+      const res = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'membership' }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.init_point) {
+        throw new Error(data.error || (lang === 'es' ? 'Error al crear preferencia de pago' : 'Failed to create payment'))
+      }
+      window.location.href = data.init_point
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : (lang === 'es' ? 'Error al procesar el pago' : 'Payment error'), 'error')
       setLoading(false)
-      return
     }
-
-    // Update profile
-    const { error: profError } = await supabase.from('profiles').update({
-      membership_paid: true
-    }).eq('id', userId)
-
-    if (profError) {
-      showToast(lang === 'es' ? 'Error al actualizar perfil' : 'Profile update error', 'error')
-      setLoading(false)
-      return
-    }
-
-    showToast(lang === 'es' ? 'Membresía activada 🎉' : 'Membership activated! 🎉', 'success')
-    setTimeout(() => {
-      router.push('/dashboard')
-      router.refresh()
-    }, 1000)
   }
 
   return (
@@ -249,7 +230,7 @@ export default function RegisterPage() {
               </button>
 
               <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                🔒 {lang === 'es' ? 'Pago simulado. En producción usa Stripe/Conekta.' : 'Simulated payment. In production, connect Stripe/Conekta.'}
+                🔒 {lang === 'es' ? 'Pago seguro con MercadoPago' : 'Secure payment via MercadoPago'}
               </div>
             </>
           )}

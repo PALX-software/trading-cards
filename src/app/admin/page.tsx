@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Users, CreditCard, Gavel, RefreshCw,
@@ -136,8 +135,7 @@ const TD: React.FC<{ children: React.ReactNode; style?: React.CSSProperties; col
 
 // ─── Main page ────────────────────────────────────────────────
 export default function AdminPage() {
-  const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const [tab, setTab]                 = useState<TabId>('usuarios')
   const [loading, setLoading]         = useState(true)
@@ -159,7 +157,7 @@ export default function AdminPage() {
   async function loadAll() {
     setLoading(true)
     const [usersRes, paymentsRes, auctionsRes, tradesRes] = await Promise.all([
-      supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(200),
       supabase.from('payments').select('*, user:profiles!user_id(username, avatar_url)').order('created_at', { ascending: false }).limit(200),
       supabase.from('auctions').select('*, seller:profiles!seller_id(username)').order('created_at', { ascending: false }).limit(200),
       supabase.from('trades').select('*, proposer:profiles!proposer_id(username)').order('created_at', { ascending: false }).limit(200),
@@ -200,11 +198,9 @@ export default function AdminPage() {
   async function forceCloseAuction(id: string) {
     setActionLoading(`auction-${id}`)
     try {
-      const { error } = await supabase
-        .from('auctions')
-        .update({ status: 'cancelled' })
-        .eq('id', id)
-      if (error) throw new Error(error.message)
+      const res = await fetch(`/api/admin/auctions/${id}`, { method: 'PATCH' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Error')
       showToast('Subasta cerrada')
       setAuctions(prev => prev.map(a => a.id === id ? { ...a, status: 'cancelled' } : a))
     } catch (e: unknown) {

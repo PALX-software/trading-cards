@@ -45,15 +45,21 @@ export async function PATCH(
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // 2. Check that the calling user has is_admin = true
+  // 2. Check that the calling user has is_admin = true (or is the configured admin email)
   const serviceClient = await createServiceClient()
-  const { data: callerProfile, error: profileError } = await serviceClient
-    .from('profiles')
-    .select('is_admin')
-    .eq('id', user.id)
-    .single()
+  const adminEmail = process.env.ADMIN_EMAIL
+  let isAdmin = adminEmail ? user.email === adminEmail : false
 
-  if (profileError || !callerProfile?.is_admin) {
+  if (!isAdmin) {
+    const { data: callerProfile } = await serviceClient
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single()
+    isAdmin = callerProfile?.is_admin ?? false
+  }
+
+  if (!isAdmin) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
 
