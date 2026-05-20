@@ -20,6 +20,7 @@ export interface Profile {
   membership_paid: boolean
   membership_paid_at: string | null
   balance: number
+  is_admin: boolean
   created_at: string
   updated_at: string
 }

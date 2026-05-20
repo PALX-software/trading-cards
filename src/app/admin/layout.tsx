@@ -19,15 +19,20 @@ export default async function AdminLayout({
     redirect('/')
   }
 
-  // Verify admin flag from profiles table
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('is_admin')
-    .eq('id', user.id)
-    .single()
+  // Admin check: is_admin flag OR hardcoded admin email
+  const ADMIN_EMAIL = 'joseluispalillero@gmail.com'
+  const isAdminByEmail = user.email === ADMIN_EMAIL
 
-  if (profileError || !profile?.is_admin) {
-    redirect('/')
+  if (!isAdminByEmail) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.is_admin) {
+      redirect('/')
+    }
   }
 
   return (
