@@ -94,6 +94,8 @@ export default function RootLayout({
   return (
     <html lang="es" className="dark">
       <head>
+        <link rel="preconnect" href="https://jwfdqrmjglumnvrkfgag.supabase.co" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
