@@ -61,7 +61,7 @@ export default function AuctionsPage() {
       return
     }
 
-    if (!user.membership_paid) {
+    if (!user.membership_paid && !user.is_admin) {
       showToast(lang === 'es' ? 'Se requiere membresía' : 'Membership required to join auctions', 'error')
       router.push('/auth/register')
       return

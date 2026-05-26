@@ -50,7 +50,7 @@ function NewTradeContent() {
         router.push('/auth/login')
         return
       }
-      if (!profile.membership_paid) {
+      if (!profile.membership_paid && !profile.is_admin) {
         router.push('/dashboard?membership=required')
         return
       }

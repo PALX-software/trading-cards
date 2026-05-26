@@ -42,7 +42,7 @@ export default function CreateAuctionPage() {
         .eq('id', authUser.id)
         .single()
 
-      if (!profile?.membership_paid) {
+      if (!profile?.membership_paid && !profile?.is_admin) {
         showToast('Necesitas una membresía para crear subastas', 'error')
         router.push('/auth/register')
         return

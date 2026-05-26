@@ -35,7 +35,7 @@ export default function AddCardPage() {
     supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
       if (!authUser) { router.push('/auth/login'); return }
       const { data } = await supabase.from('profiles').select('*').eq('id', authUser.id).single()
-      if (!data?.membership_paid) {
+      if (!data?.membership_paid && !data?.is_admin) {
         showToast('Membership required to list cards', 'error')
         router.push('/auth/register')
         return
