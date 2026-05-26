@@ -204,7 +204,7 @@ export default function HomePage() {
               ¿Quieres pujar? Primero necesitas una cuenta
             </h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
-              Únete gratis, activa tu membresía por $100 MXN y accede a todas las subastas del Mundial 2026
+              Únete gratis, activa tu membresía por $30 MXN y accede a todas las subastas del Mundial 2026
             </p>
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
               <Link href="/auth/register" className="btn btn-primary">

@@ -111,8 +111,8 @@ export interface AuctionParticipant {
 
 // Pricing constants (MXN)
 export const PRICING = {
-  MEMBERSHIP_FEE: 100,
-  AUCTION_CREATION_FEE: 50,
+  MEMBERSHIP_FEE: 30,
+  AUCTION_CREATION_FEE: 20,
   AUCTION_ENTRY_FEE: 10,
   TRADE_SEARCH_FEE: 50,
   TRADE_ACCEPT_FEE: 20,

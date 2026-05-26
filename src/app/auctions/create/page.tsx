@@ -6,10 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import ToastContainer, { showToast } from '@/components/Toast'
 import type { Profile } from '@/lib/types'
-import { PRICING, VERIFICATION_ADDRESS } from '@/lib/types'
+import { PRICING } from '@/lib/types'
 import { STICKER_CATALOG } from '@/lib/catalog'
 import type { StickerDef } from '@/lib/catalog'
-import { Gavel, ArrowLeft, CreditCard, Package, MapPin, TrendingUp, CheckCircle, Search, Check } from 'lucide-react'
+import { Gavel, ArrowLeft, CreditCard, Package, TrendingUp, CheckCircle, Search, Check } from 'lucide-react'
 import Link from 'next/link'
 
 const DURATION_OPTIONS = [1, 3, 5, 7, 14, 21, 30]
@@ -161,7 +161,6 @@ export default function CreateAuctionPage() {
         ends_at:          endsAt,
         duration_days:    form.durationDays,
         commission_pct:   10,
-        shipping_address: VERIFICATION_ADDRESS.full,
       })
       .select('id')
       .single()
@@ -368,28 +367,14 @@ export default function CreateAuctionPage() {
             {step === 'details' && (
               <form onSubmit={handleDetailsStepSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-                {/* Verification notice */}
-                <div className="card-gold" style={{ padding: '1.25rem 1.5rem', borderLeft: '4px solid var(--gold)' }}>
-                  <h3 style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gold)' }}>
+                {/* Payment hold notice */}
+                <div className="card" style={{ padding: '1.25rem 1.5rem', borderLeft: '4px solid var(--gold)' }}>
+                  <h3 style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center', color: 'var(--gold)' }}>
                     <Package size={16} />
-                    Verificación obligatoria
+                    Envío físico (opcional)
                   </h3>
-                  <p style={{ fontSize: '0.85rem', marginBottom: '0.875rem', lineHeight: 1.5 }}>
-                    Tu estampa física debe ser enviada <strong>ANTES</strong> de que la subasta se active.
-                  </p>
-                  <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '0.5rem', padding: '0.875rem 1rem', marginBottom: '0.875rem', fontSize: '0.85rem', lineHeight: 1.7 }}>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                      <MapPin size={15} style={{ color: 'var(--gold)', flexShrink: 0, marginTop: '0.2rem' }} />
-                      <div>
-                        <div style={{ fontWeight: 700, marginBottom: '0.15rem' }}>Dirección de verificación:</div>
-                        <div>{VERIFICATION_ADDRESS.street}</div>
-                        <div>{VERIFICATION_ADDRESS.neighborhood}</div>
-                        <div>{VERIFICATION_ADDRESS.city}, C.P. {VERIFICATION_ADDRESS.zipCode}</div>
-                      </div>
-                    </div>
-                  </div>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                    Una vez recibida y verificada, tu subasta se activará automáticamente.
+                  <p style={{ fontSize: '0.85rem', lineHeight: 1.6, color: 'var(--text-secondary)' }}>
+                    Puedes subir tu estampa sin enviarla físicamente. El pago del ganador quedará <strong style={{ color: 'var(--gold)' }}>retenido</strong> hasta que el comprador confirme la entrega y la valide.
                   </p>
                 </div>
 
@@ -626,7 +611,7 @@ export default function CreateAuctionPage() {
 
                   <div className="glass-gold" style={{ padding: '1rem', borderRadius: '0.75rem', marginBottom: '1.5rem', fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                     <strong style={{ color: 'var(--gold)' }}>Pago seguro vía MercadoPago.</strong>{' '}
-                    Serás redirigido al pago. Una vez confirmado y verificada tu estampa, la subasta se activará automáticamente.
+                    Serás redirigido al pago. Una vez confirmado, la subasta se activará automáticamente. El pago del ganador quedará retenido hasta que confirme la entrega.
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.75rem' }}>
