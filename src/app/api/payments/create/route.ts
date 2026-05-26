@@ -81,6 +81,11 @@ export async function POST(request: Request) {
     ...(referenceId ? { referenceId } : {}),
   }
 
+  if (!process.env.MP_ACCESS_TOKEN) {
+    console.error('[payments/create] MP_ACCESS_TOKEN is not set')
+    return Response.json({ error: 'MP_ACCESS_TOKEN not configured' }, { status: 500 })
+  }
+
   let preference: { initPoint: string; sandboxInitPoint: string; preferenceId: string }
   try {
     preference = await createMPPreference({
@@ -89,9 +94,10 @@ export async function POST(request: Request) {
       externalRef,
       baseUrl,
     })
-  } catch (err) {
-    console.error('[payments/create] MP preference error:', err)
-    return Response.json({ error: 'Failed to create MercadoPago preference' }, { status: 500 })
+  } catch (err: any) {
+    const detail = err?.message ?? err?.cause?.message ?? JSON.stringify(err)
+    console.error('[payments/create] MP preference error:', detail)
+    return Response.json({ error: `MercadoPago error: ${detail}` }, { status: 500 })
   }
 
   const initPoint =
