@@ -1,6 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { getMPClient } from '@/lib/mercadopago'
-import { Payment } from 'mercadopago'
 import type { MPExternalRef } from '@/lib/mercadopago'
 
 async function validateMPSignature(
@@ -78,10 +76,16 @@ export async function POST(request: Request) {
     return new Response('OK', { status: 200 })
   }
 
-  let paymentData: Awaited<ReturnType<Payment['get']>>
+  let paymentData: { status: string; external_reference?: string | null }
   try {
-    const mpPayment = new Payment(getMPClient())
-    paymentData = await mpPayment.get({ id: paymentId })
+    const res = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` },
+    })
+    if (!res.ok) {
+      console.error('[webhook] MP payment fetch failed:', res.status, await res.text())
+      return new Response('OK', { status: 200 })
+    }
+    paymentData = await res.json()
   } catch (err) {
     console.error('[webhook] Failed to fetch MP payment:', err)
     return new Response('OK', { status: 200 })
