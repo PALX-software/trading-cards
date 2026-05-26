@@ -68,6 +68,7 @@ export interface Auction {
   tracking_number: string | null
   commission_pct: number
   shipping_address: string | null
+  entry_fee: number
   created_at: string
   updated_at: string
   // Joined

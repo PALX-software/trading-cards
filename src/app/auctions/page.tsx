@@ -81,10 +81,13 @@ export default function AuctionsPage() {
       return
     }
 
+    const auction = auctions.find(a => a.id === auctionId)
+    const entryFee = auction?.entry_fee ?? PRICING.AUCTION_ENTRY_FEE
+
     const { error: payError } = await supabase.from('payments').insert({
       user_id: user.id,
       type: 'auction_entry',
-      amount: PRICING.AUCTION_ENTRY_FEE,
+      amount: entryFee,
       status: 'completed',
       payment_method: 'simulated'
     })
@@ -107,7 +110,7 @@ export default function AuctionsPage() {
       return
     }
 
-    showToast(lang === 'es' ? 'Cuota de $10 MXN pagada. ¡Entrando!' : 'Entry fee paid. Joining auction!', 'success')
+    showToast(lang === 'es' ? `Cuota de $${entryFee} MXN pagada. ¡Entrando!` : `Entry fee $${entryFee} MXN paid. Joining!`, 'success')
     router.push(`/auctions/${auctionId}`)
   }
 
@@ -124,8 +127,8 @@ export default function AuctionsPage() {
             </h1>
             <p className="page-subtitle">
               {lang === 'es'
-                ? `Costo de entrada: $${PRICING.AUCTION_ENTRY_FEE} MXN por sala para pujas ilimitadas.`
-                : `Entry fee: $${PRICING.AUCTION_ENTRY_FEE} MXN per room to place unlimited bids.`}
+                ? 'Paga la entrada de cada sala para pujar sin límite.'
+                : 'Pay the entry fee per room to place unlimited bids.'}
             </p>
           </div>
         </div>
@@ -203,7 +206,7 @@ export default function AuctionsPage() {
                         </span>
                         {!enteringId && (
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'rgba(0,0,0,0.2)', padding: '0.2rem 0.5rem', borderRadius: '0.25rem', fontSize: '0.8rem' }}>
-                            ${PRICING.AUCTION_ENTRY_FEE} MXN <ArrowRight size={12} />
+                            ${auction.entry_fee ?? PRICING.AUCTION_ENTRY_FEE} MXN <ArrowRight size={12} />
                           </span>
                         )}
                       </button>

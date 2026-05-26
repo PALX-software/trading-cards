@@ -1,46 +1,63 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import ToastContainer, { showToast } from '@/components/Toast'
-import type { Card, Profile } from '@/lib/types'
-import { PRICING, RARITY_LABELS, VERIFICATION_ADDRESS } from '@/lib/types'
-import { Gavel, ArrowLeft, CreditCard, Package, MapPin, TrendingUp, CheckCircle } from 'lucide-react'
+import type { Profile } from '@/lib/types'
+import { PRICING, VERIFICATION_ADDRESS } from '@/lib/types'
+import { STICKER_CATALOG } from '@/lib/catalog'
+import type { StickerDef } from '@/lib/catalog'
+import { Gavel, ArrowLeft, CreditCard, Package, MapPin, TrendingUp, CheckCircle, Search, Check } from 'lucide-react'
 import Link from 'next/link'
 
-const DURATION_OPTIONS = [3, 5, 7, 14, 21, 30]
+const DURATION_OPTIONS = [1, 3, 5, 7, 14, 21, 30]
+const ENTRY_FEE_OPTIONS = [5, 10, 15, 20, 30, 50]
 
-type Step = 'card' | 'details' | 'confirm'
+type Step = 'sticker' | 'details' | 'confirm'
+
+interface DupSticker {
+  sticker_number: string
+  quantity: number
+  sticker: StickerDef | null
+}
+
+function stickerRarity(type: string | undefined) {
+  if (type === 'special') return 'legendary'
+  if (type === 'logo')    return 'rare'
+  if (type === 'badge')   return 'uncommon'
+  return 'common'
+}
 
 export default function CreateAuctionPage() {
-  const router = useRouter()
+  const router  = useRouter()
   const supabase = createClient()
-  const [user, setUser] = useState<Profile | null>(null)
-  const [myCards, setMyCards] = useState<Card[]>([])
-  const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState<Step>('card')
+  const [user,       setUser]       = useState<Profile | null>(null)
+  const [dupStickers, setDupStickers] = useState<DupSticker[]>([])
+  const [loading,    setLoading]    = useState(false)
+  const [step,       setStep]       = useState<Step>('sticker')
+
+  const [selectedNumber, setSelectedNumber] = useState<string>('')
+  const [search,         setSearch]         = useState<string>('')
 
   const [form, setForm] = useState({
-    cardId: '',
-    title: '',
-    description: '',
-    startingPrice: '50',
+    title:           '',
+    description:     '',
+    startingPrice:   '50',
     minBidIncrement: '10',
-    buyNowPrice: '',
-    durationDays: 7,
+    buyNowPrice:     '',
+    durationDays:    7,
+    entryFee:        PRICING.AUCTION_ENTRY_FEE as number,
   })
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
+    const init = async () => {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) { router.push('/auth/login'); return }
 
       const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single()
+        .from('profiles').select('*').eq('id', authUser.id).single()
 
       if (!profile?.membership_paid && !profile?.is_admin) {
         showToast('Necesitas una membresía para crear subastas', 'error')
@@ -49,18 +66,41 @@ export default function CreateAuctionPage() {
       }
       setUser(profile)
 
-      const { data: cards } = await supabase
-        .from('cards')
-        .select('*')
-        .eq('owner_id', authUser.id)
-        .eq('is_for_auction', false)
+      const { data: dupes } = await supabase
+        .from('user_stickers')
+        .select('sticker_number, quantity, sticker:sticker_catalog(*)')
+        .eq('user_id', authUser.id)
+        .gt('quantity', 1)
 
-      setMyCards(cards || [])
-    })
+      setDupStickers((dupes as any[])?.map(d => ({
+        sticker_number: d.sticker_number,
+        quantity:       d.quantity,
+        sticker:        d.sticker as StickerDef | null,
+      })) || [])
+    }
+    init()
   }, [])
 
-  const handleCardStepSubmit = () => {
-    if (!form.cardId) { showToast('Selecciona una tarjeta', 'error'); return }
+  const selectedSticker = useMemo(
+    () => dupStickers.find(d => d.sticker_number === selectedNumber)?.sticker ?? null,
+    [selectedNumber, dupStickers]
+  )
+
+  const filteredDupes = useMemo<DupSticker[]>(() => {
+    if (!search.trim()) return dupStickers
+    const q = search.toLowerCase()
+    return dupStickers.filter(d =>
+      d.sticker?.player_name.toLowerCase().includes(q) ||
+      d.sticker?.team.toLowerCase().includes(q) ||
+      d.sticker_number.includes(q)
+    )
+  }, [search, dupStickers])
+
+  const handleStickerStepSubmit = () => {
+    if (!selectedNumber) { showToast('Selecciona una estampa', 'error'); return }
+    if (selectedSticker && !form.title) {
+      setForm(f => ({ ...f, title: `${selectedSticker.player_name} — ${selectedSticker.team} WC 2026` }))
+    }
     setStep('details')
   }
 
@@ -74,41 +114,77 @@ export default function CreateAuctionPage() {
   }
 
   const handleCreateAndPay = async () => {
-    if (!user) return
+    if (!user || !selectedSticker) return
     setLoading(true)
 
-    const now = new Date()
-    const startsAt = now.toISOString()
-    const endsAt = new Date(now.getTime() + form.durationDays * 86400 * 1000).toISOString()
+    // Auto-create a card entry from sticker data so existing auction system works
+    const { data: card, error: cardError } = await supabase
+      .from('cards')
+      .insert({
+        owner_id:    user.id,
+        player_name: selectedSticker.player_name,
+        team:        selectedSticker.team,
+        year:        2026,
+        card_number: selectedSticker.number,
+        series:      'Panini FIFA WC 2026',
+        rarity:      stickerRarity(selectedSticker.sticker_type),
+        condition:   'good',
+        title:       form.title,
+        description: form.description || null,
+        image_url:   selectedSticker.image_url || null,
+        is_for_sale:    false,
+        is_for_auction: true,
+      })
+      .select('id')
+      .single()
 
-    // 1. Create draft auction
-    const { data: auction, error } = await supabase.from('auctions').insert({
-      card_id: form.cardId,
-      seller_id: user.id,
-      title: form.title,
-      description: form.description || null,
-      starting_price: parseFloat(form.startingPrice),
-      current_price: parseFloat(form.startingPrice),
-      min_bid_increment: parseFloat(form.minBidIncrement),
-      buy_now_price: form.buyNowPrice ? parseFloat(form.buyNowPrice) : null,
-      creation_fee_paid: false,
-      status: 'draft',
-      starts_at: startsAt,
-      ends_at: endsAt,
-      duration_days: form.durationDays,
-      commission_pct: 10,
-      shipping_address: VERIFICATION_ADDRESS.full,
-    }).select().single()
+    if (cardError) { showToast(cardError.message, 'error'); setLoading(false); return }
 
-    if (error) { showToast(error.message, 'error'); setLoading(false); return }
+    const now     = new Date()
+    const endsAt  = new Date(now.getTime() + form.durationDays * 86400 * 1000).toISOString()
 
-    // 2. Create MP preference and redirect
+    const { data: auction, error: auctionError } = await supabase
+      .from('auctions')
+      .insert({
+        card_id:          card.id,
+        seller_id:        user.id,
+        title:            form.title,
+        description:      form.description || null,
+        starting_price:   parseFloat(form.startingPrice),
+        current_price:    parseFloat(form.startingPrice),
+        min_bid_increment: parseFloat(form.minBidIncrement),
+        buy_now_price:    form.buyNowPrice ? parseFloat(form.buyNowPrice) : null,
+        entry_fee:        form.entryFee,
+        creation_fee_paid: false,
+        status:           'draft',
+        starts_at:        now.toISOString(),
+        ends_at:          endsAt,
+        duration_days:    form.durationDays,
+        commission_pct:   10,
+        shipping_address: VERIFICATION_ADDRESS.full,
+      })
+      .select('id')
+      .single()
+
+    if (auctionError) {
+      // Roll back card if auction failed
+      await supabase.from('cards').delete().eq('id', card.id)
+      showToast(auctionError.message, 'error')
+      setLoading(false)
+      return
+    }
+
     const res = await fetch('/api/payments/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'auction_creation', referenceId: auction.id }),
     })
-    const { init_point } = await res.json()
+    const { init_point, error: payError } = await res.json()
+    if (payError) {
+      showToast(payError, 'error')
+      setLoading(false)
+      return
+    }
     window.location.href = init_point
   }
 
@@ -123,19 +199,18 @@ export default function CreateAuctionPage() {
     )
   }
 
-  const selectedCard = myCards.find(c => c.id === form.cardId)
-  const startingPriceNum = parseFloat(form.startingPrice) || 0
-  const commissionAmount = (startingPriceNum * 0.1).toFixed(2)
-  const sellerReceives = (startingPriceNum * 0.9).toFixed(2)
-  const endsOnDate = new Date(Date.now() + form.durationDays * 86400 * 1000)
+  const startingPriceNum  = parseFloat(form.startingPrice) || 0
+  const commissionAmount  = (startingPriceNum * 0.1).toFixed(2)
+  const sellerReceives    = (startingPriceNum * 0.9).toFixed(2)
+  const endsOnDate        = new Date(Date.now() + form.durationDays * 86400 * 1000)
 
   const stepLabels: Record<Step, string> = {
-    card: '1. Tarjeta',
+    sticker: '1. Estampa',
     details: '2. Detalles',
     confirm: '3. Confirmar',
   }
-  const stepOrder: Step[] = ['card', 'details', 'confirm']
-  const currentStepIndex = stepOrder.indexOf(step)
+  const stepOrder: Step[] = ['sticker', 'details', 'confirm']
+  const currentStepIndex  = stepOrder.indexOf(step)
 
   return (
     <>
@@ -153,7 +228,7 @@ export default function CreateAuctionPage() {
               Crear <span className="gradient-text">Subasta</span>
             </h1>
             <p className="page-subtitle">
-              Publica tu tarjeta FIFA World Cup en subasta — cuota de creación: ${PRICING.AUCTION_CREATION_FEE} MXN
+              Subasta una de tus estampas duplicadas — cuota de creación: ${PRICING.AUCTION_CREATION_FEE} MXN
             </p>
 
             {/* Step indicator */}
@@ -162,9 +237,7 @@ export default function CreateAuctionPage() {
                 <div
                   key={s}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
+                    display: 'flex', alignItems: 'center', gap: '0.35rem',
                     fontSize: '0.8rem',
                     fontWeight: i <= currentStepIndex ? 700 : 400,
                     color: i <= currentStepIndex ? 'var(--gold)' : 'var(--text-muted)',
@@ -175,7 +248,7 @@ export default function CreateAuctionPage() {
                     : <span style={{
                         width: '18px', height: '18px', borderRadius: '50%',
                         background: i === currentStepIndex ? 'var(--gold)' : 'var(--border)',
-                        color: i === currentStepIndex ? '#000' : 'var(--text-muted)',
+                        color:      i === currentStepIndex ? '#000' : 'var(--text-muted)',
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: '0.7rem', fontWeight: 700,
                       }}>{i + 1}</span>
@@ -193,55 +266,98 @@ export default function CreateAuctionPage() {
         <div className="container-main" style={{ paddingTop: '2rem' }}>
           <div style={{ maxWidth: '680px', margin: '0 auto' }}>
 
-            {/* ── STEP 1: Card selection ── */}
-            {step === 'card' && (
+            {/* ── STEP 1: Sticker selection ── */}
+            {step === 'sticker' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                 <div className="card">
                   <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                     <Package size={18} style={{ color: 'var(--gold)' }} />
-                    Selecciona la tarjeta a subastar
+                    ¿Qué estampa quieres subastar?
                   </h2>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                    Solo puedes subastar estampas que tengas duplicadas en tu álbum.
+                  </p>
 
-                  {myCards.length === 0 ? (
+                  {dupStickers.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                      <p>No tienes tarjetas disponibles para subastar.</p>
-                      <Link href="/dashboard/cards/add" className="btn btn-primary btn-sm" style={{ marginTop: '1rem' }}>
-                        Agregar tarjeta
+                      <p style={{ marginBottom: '1rem' }}>No tienes estampas duplicadas disponibles.</p>
+                      <Link href="/dashboard/album" className="btn btn-primary btn-sm">
+                        Ir al álbum
                       </Link>
                     </div>
                   ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.75rem' }}>
-                      {myCards.map(card => (
-                        <div
-                          key={card.id}
-                          onClick={() => setForm({ ...form, cardId: card.id })}
-                          style={{
-                            border: `2px solid ${form.cardId === card.id ? 'var(--gold)' : 'var(--border)'}`,
-                            borderRadius: '0.75rem',
-                            padding: '0.75rem',
-                            cursor: 'pointer',
-                            background: form.cardId === card.id ? 'rgba(245,158,11,0.05)' : 'transparent',
-                            transition: 'all 0.2s ease',
-                            textAlign: 'center',
-                          }}
-                        >
-                          <div style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>⚽</div>
-                          <div style={{ fontSize: '0.78rem', fontWeight: 700, lineHeight: 1.2 }}>{card.player_name}</div>
-                          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{card.team}</div>
-                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>{card.year}</div>
-                          <div style={{ fontSize: '0.6rem', color: 'var(--gold)', marginTop: '0.25rem' }}>{RARITY_LABELS[card.rarity]}</div>
-                        </div>
-                      ))}
-                    </div>
+                    <>
+                      {/* Search */}
+                      <div style={{ position: 'relative', marginBottom: '0.875rem' }}>
+                        <Search size={14} style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="Busca por jugador, equipo o número..."
+                          value={search}
+                          onChange={e => setSearch(e.target.value)}
+                          style={{ paddingLeft: '2.25rem' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '320px', overflowY: 'auto' }}>
+                        {filteredDupes.length === 0 ? (
+                          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '0.5rem 0' }}>
+                            Sin resultados para "{search}"
+                          </p>
+                        ) : (
+                          filteredDupes.map(d => (
+                            <button
+                              key={d.sticker_number}
+                              type="button"
+                              onClick={() => setSelectedNumber(d.sticker_number)}
+                              style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                padding: '0.625rem 0.875rem',
+                                borderRadius: '0.5rem',
+                                background:  selectedNumber === d.sticker_number ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.03)',
+                                border:      selectedNumber === d.sticker_number ? '1px solid rgba(245,158,11,0.35)' : '1px solid var(--border)',
+                                cursor: 'pointer', textAlign: 'left', width: '100%', transition: 'all 0.15s',
+                              }}
+                            >
+                              <span style={{ fontSize: '0.85rem' }}>
+                                <span className="badge" style={{ fontSize: '0.68rem', marginRight: '0.5rem' }}>#{d.sticker_number}</span>
+                                <strong>{d.sticker?.player_name ?? d.sticker_number}</strong>
+                                <span style={{ color: 'var(--text-secondary)', marginLeft: '0.375rem' }}>{d.sticker?.team}</span>
+                              </span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>×{d.quantity}</span>
+                                {selectedNumber === d.sticker_number && <Check size={14} style={{ color: 'var(--gold)' }} />}
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
+
+                {/* Preview of selected sticker */}
+                {selectedSticker && (
+                  <div className="card-gold" style={{ padding: '1rem 1.25rem' }}>
+                    <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.35rem' }}>
+                      Estampa seleccionada
+                    </p>
+                    <p style={{ fontWeight: 700, fontSize: '1rem' }}>
+                      #{selectedSticker.number} — {selectedSticker.player_name}
+                    </p>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.1rem' }}>
+                      {selectedSticker.team} · {selectedSticker.section}
+                    </p>
+                  </div>
+                )}
 
                 <button
                   type="button"
                   className="btn btn-primary btn-lg"
                   style={{ width: '100%' }}
-                  onClick={handleCardStepSubmit}
-                  disabled={!form.cardId}
+                  onClick={handleStickerStepSubmit}
+                  disabled={!selectedNumber}
                 >
                   Continuar a detalles →
                 </button>
@@ -253,25 +369,15 @@ export default function CreateAuctionPage() {
               <form onSubmit={handleDetailsStepSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
                 {/* Verification notice */}
-                <div className="card-gold" style={{
-                  padding: '1.25rem 1.5rem',
-                  borderLeft: '4px solid var(--gold)',
-                }}>
+                <div className="card-gold" style={{ padding: '1.25rem 1.5rem', borderLeft: '4px solid var(--gold)' }}>
                   <h3 style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--gold)' }}>
                     <Package size={16} />
                     Verificación obligatoria
                   </h3>
                   <p style={{ fontSize: '0.85rem', marginBottom: '0.875rem', lineHeight: 1.5 }}>
-                    Tu tarjeta debe ser enviada <strong>ANTES</strong> de que la subasta se active.
+                    Tu estampa física debe ser enviada <strong>ANTES</strong> de que la subasta se active.
                   </p>
-                  <div style={{
-                    background: 'rgba(0,0,0,0.2)',
-                    borderRadius: '0.5rem',
-                    padding: '0.875rem 1rem',
-                    marginBottom: '0.875rem',
-                    fontSize: '0.85rem',
-                    lineHeight: 1.7,
-                  }}>
+                  <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '0.5rem', padding: '0.875rem 1rem', marginBottom: '0.875rem', fontSize: '0.85rem', lineHeight: 1.7 }}>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
                       <MapPin size={15} style={{ color: 'var(--gold)', flexShrink: 0, marginTop: '0.2rem' }} />
                       <div>
@@ -284,25 +390,20 @@ export default function CreateAuctionPage() {
                   </div>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                     Una vez recibida y verificada, tu subasta se activará automáticamente.
-                    Te notificaremos por correo cuando la tarjeta sea recibida.
                   </p>
                 </div>
 
                 {/* Commission disclosure */}
-                <div className="card" style={{
-                  padding: '1.25rem 1.5rem',
-                  borderLeft: '4px solid var(--border)',
-                }}>
+                <div className="card" style={{ padding: '1.25rem 1.5rem', borderLeft: '4px solid var(--border)' }}>
                   <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', gap: '0.5rem', alignItems: 'center', color: 'var(--text-secondary)' }}>
                     <TrendingUp size={15} />
                     Comisión de la plataforma
                   </h3>
                   <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: '0.5rem' }}>
                     La plataforma retiene el <strong style={{ color: 'var(--text-secondary)' }}>10%</strong> del precio final de la subasta.
-                    El envío de la tarjeta al ganador también corre a cargo de la plataforma.
                   </p>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                    Ejemplo: Si tu subasta cierra en <strong style={{ color: 'var(--text-secondary)' }}>$500 MXN</strong>, recibirás <strong style={{ color: 'var(--gold)' }}>$450 MXN</strong>.
+                    Ejemplo: Si cierra en <strong style={{ color: 'var(--text-secondary)' }}>$500 MXN</strong>, recibirás <strong style={{ color: 'var(--gold)' }}>$450 MXN</strong>.
                   </p>
                 </div>
 
@@ -313,14 +414,14 @@ export default function CreateAuctionPage() {
                     Detalles de la subasta
                   </h2>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     <div className="form-group">
                       <label className="form-label" htmlFor="auction-title">Título de la subasta</label>
                       <input
                         id="auction-title"
                         type="text"
                         className="form-input"
-                        placeholder="ej. Messi Legendary Gem Mint 2022"
+                        placeholder="ej. Messi — Argentina WC 2026"
                         value={form.title}
                         onChange={e => setForm({ ...form, title: e.target.value })}
                         required
@@ -332,15 +433,15 @@ export default function CreateAuctionPage() {
                       <textarea
                         id="auction-description"
                         className="form-input"
-                        placeholder="Describe el estado de la tarjeta, autenticidad, etc."
+                        placeholder="Estado de la estampa, notas de autenticidad, etc."
                         value={form.description}
                         onChange={e => setForm({ ...form, description: e.target.value })}
-                        rows={3}
+                        rows={2}
                         style={{ resize: 'vertical' }}
                       />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                       <div className="form-group">
                         <label className="form-label" htmlFor="auction-starting-price">Precio inicial (MXN)</label>
                         <input
@@ -367,22 +468,53 @@ export default function CreateAuctionPage() {
                           required
                         />
                       </div>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="auction-buy-now">Precio fijo (opcional)</label>
-                        <input
-                          id="auction-buy-now"
-                          type="number"
-                          className="form-input"
-                          placeholder="Dejar vacío para desactivar"
-                          value={form.buyNowPrice}
-                          onChange={e => setForm({ ...form, buyNowPrice: e.target.value })}
-                          min="1"
-                          step="0.01"
-                        />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" htmlFor="auction-buy-now">Precio fijo "Cómpralo ya" (opcional)</label>
+                      <input
+                        id="auction-buy-now"
+                        type="number"
+                        className="form-input"
+                        placeholder="Dejar vacío para desactivar"
+                        value={form.buyNowPrice}
+                        onChange={e => setForm({ ...form, buyNowPrice: e.target.value })}
+                        min="1"
+                        step="0.01"
+                      />
+                    </div>
+
+                    {/* Entry fee */}
+                    <div className="form-group">
+                      <label className="form-label">Cuota de entrada por participante (MXN)</label>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                        Cada participante pagará esta cuota para entrar a la sala y pujar.
+                      </p>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {ENTRY_FEE_OPTIONS.map(fee => (
+                          <button
+                            key={fee}
+                            type="button"
+                            onClick={() => setForm({ ...form, entryFee: fee })}
+                            style={{
+                              padding: '0.4rem 0.9rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.82rem',
+                              fontWeight: form.entryFee === fee ? 700 : 400,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              background: form.entryFee === fee ? 'var(--gold)' : 'transparent',
+                              color:      form.entryFee === fee ? '#000' : 'var(--text-secondary)',
+                              border:     form.entryFee === fee ? 'none' : '1px solid var(--border)',
+                            }}
+                          >
+                            ${fee} MXN
+                          </button>
+                        ))}
                       </div>
                     </div>
 
-                    {/* Duration selector */}
+                    {/* Duration */}
                     <div className="form-group">
                       <label className="form-label">Duración de la subasta</label>
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
@@ -399,11 +531,11 @@ export default function CreateAuctionPage() {
                               cursor: 'pointer',
                               transition: 'all 0.15s ease',
                               background: form.durationDays === days ? 'var(--gold)' : 'transparent',
-                              color: form.durationDays === days ? '#000' : 'var(--text-secondary)',
-                              border: form.durationDays === days ? 'none' : '1px solid var(--border)',
+                              color:      form.durationDays === days ? '#000' : 'var(--text-secondary)',
+                              border:     form.durationDays === days ? 'none' : '1px solid var(--border)',
                             }}
                           >
-                            {days} días
+                            {days === 1 ? '1 día' : `${days} días`}
                           </button>
                         ))}
                       </div>
@@ -416,7 +548,7 @@ export default function CreateAuctionPage() {
                     type="button"
                     className="btn btn-secondary"
                     style={{ flex: 1 }}
-                    onClick={() => setStep('card')}
+                    onClick={() => setStep('sticker')}
                   >
                     <ArrowLeft size={14} /> Volver
                   </button>
@@ -440,22 +572,15 @@ export default function CreateAuctionPage() {
                     Confirmar y pagar
                   </h2>
 
-                  {/* Summary */}
-                  <div style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '0.75rem',
-                    padding: '1.25rem',
-                    marginBottom: '1.5rem',
-                  }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '1.25rem', marginBottom: '1.5rem' }}>
                     <h3 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
                       Resumen de la subasta
                     </h3>
 
-                    {selectedCard && (
+                    {selectedSticker && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.9rem' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>Tarjeta</span>
-                        <span style={{ fontWeight: 600 }}>{selectedCard.player_name} · {selectedCard.team} {selectedCard.year}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>Estampa</span>
+                        <span style={{ fontWeight: 600 }}>#{selectedSticker.number} — {selectedSticker.player_name} · {selectedSticker.team}</span>
                       </div>
                     )}
 
@@ -470,8 +595,13 @@ export default function CreateAuctionPage() {
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.9rem' }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Cuota de entrada por participante</span>
+                      <span>${form.entryFee} MXN</span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.9rem' }}>
                       <span style={{ color: 'var(--text-muted)' }}>Duración</span>
-                      <span>{form.durationDays} días · termina el {endsOnDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                      <span>{form.durationDays} {form.durationDays === 1 ? 'día' : 'días'} · termina el {endsOnDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
                     </div>
 
                     <div className="divider" style={{ margin: '0.75rem 0' }} />
@@ -494,10 +624,9 @@ export default function CreateAuctionPage() {
                     </div>
                   </div>
 
-                  {/* MercadoPago CTA */}
                   <div className="glass-gold" style={{ padding: '1rem', borderRadius: '0.75rem', marginBottom: '1.5rem', fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                     <strong style={{ color: 'var(--gold)' }}>Pago seguro vía MercadoPago.</strong>{' '}
-                    Serás redirigido a la plataforma de pago. Una vez confirmado el pago y verificada tu tarjeta, la subasta se activará automáticamente.
+                    Serás redirigido al pago. Una vez confirmado y verificada tu estampa, la subasta se activará automáticamente.
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.75rem' }}>
