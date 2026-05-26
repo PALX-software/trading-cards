@@ -9,8 +9,15 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  trailingSlash: false,
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }]
+  },
+  async redirects() {
+    return [
+      // Redirect trailing-slash variants to canonical non-slash URLs
+      { source: '/:path+/', destination: '/:path+', permanent: true },
+    ]
   },
 };
 
